@@ -1,10 +1,6 @@
 class apiError extends Error {
-    constructor(
-        statusCode,
-        message= "Something went wrong",
-        errors = [],
-        stack = ""
-    ){
+    //stack property is a string describing the point in the code at which the Error was instantiated
+    constructor(statusCode, message = "Something went wrong", errors = [], stack = "") {
         // whenever we have to change the method or variable of parent class
         // we call super with the argument as the value that need to be changed.
         super(message)
@@ -14,12 +10,12 @@ class apiError extends Error {
         this.success = false;
         this.errors = errors
 
-        if(stack){
+        if (stack) {
             this.stack = stack
-        } else{
-            Error.captureStackTrace(this,this.constructor)
+        } else {
+            Error.captureStackTrace(this, this.constructor)
         }
     }
 }
 
-export {apiError}
+export { apiError }

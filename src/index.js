@@ -1,28 +1,26 @@
 // require('dotenv').config({path: './env'})
 
 import dotenv from "dotenv"
+dotenv.config()
 import connectDB from "./db/index.js";
 import { app } from "./app.js";
 
-dotenv.config({
-    path: './env'
-})
-
+///async operation always return a promise....like connectDB
 connectDB()
-.then(()=> {
-    
-    app.on("error", (error)=>{
-        console.log("ERR: ", error);
-        throw console.error();
-    })
+    .then(() => {
 
-    app.listen(process.env.PORT || 8000, ()=>{
-        console.log(`Server is runnig at port : ${process.env.PORT}`);
+        app.on("error", (error) => {
+            console.log("ERR: ", error);
+            throw console.error();
+        })
+
+        app.listen(process.env.PORT || 8000, () => {
+            console.log(`Server is runnig at port : ${process.env.PORT}`);
+        })
     })
-})
-.catch((err) => {
-    console.log("MONGO DB connection failed !!! ",err);
-})
+    .catch((err) => {
+        console.log("MONGO DB connection failed !!! ", err);
+    })
 
 
 /*
@@ -46,11 +44,11 @@ to use async and await for database to connect
     try{
         mongoose.connect(`${process.env.MONGODB_URI}/${DB_NAME}`)
         
-        ...........app.on is used to check if the app is properly talking with
+        ...........app.on (known as listeners ".on",,one example) is used to check if the app is properly talking with
             database or there is any error.. if there is it will throw one.
         
         app.on("error", (error)=>{
-            console.log("ERROR: ",error);
+            console.log("Application not able to tak with database: ",error);
             throw error
         });
 

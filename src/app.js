@@ -11,15 +11,17 @@ const app = express();
 
 //There is multer library for handle uploading data/files...
 
+// ".use()" method is used when we want to use some middleware or add some configurations
+
 app.use(cors({
     origin: process.env.CORS_ORIGIN,
     credentials: true
 }))
 
-app.use(express.json({limit: "16kb"}))  //data comes from url and from frontend are mostly in json format
+app.use(express.json({ limit: "16kb" }))  //data comes from url and from frontend are mostly in json format
 //and we don't want our server to crash so limit that incoming req or res size.
 
-app.use(express.urlencoded({extended: true,limit: "16kb"})) //In url the space are converted as "+" or "%20"
+app.use(express.urlencoded({ extended: true, limit: "16kb" })) //In url the space are converted as "+" or "%20"
 // to overcome that issue or encoded url. It is used. extended means nested objects are allowed
 
 app.use(express.static("public"))   //Used to store some data like images, favicon or anything

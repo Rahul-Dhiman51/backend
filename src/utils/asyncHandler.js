@@ -1,3 +1,5 @@
+/////// If we don't want to explicitly write this wrapper function then simply we can import "import handler from "express-async-handler"; "
+
 // Here we are creating wrapper functions to ease our life so that we don't have to write repeative
 //code again n again for handling async calls.
 
@@ -8,8 +10,8 @@
 const asyncHandler = (requestHandler) => {
     (err, req, res, next) => {
         Promise
-        .resolve(requestHandler(req, res, next))
-        .catch((error) => next(error))
+            .resolve(requestHandler(req, res, next))
+            .catch((error) => next(error))
     }
 }
 
