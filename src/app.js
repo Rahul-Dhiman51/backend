@@ -29,4 +29,11 @@ app.use(express.static("public"))   //Used to store some data like images, favic
 
 app.use(cookieParser())
 
+
+///////routes import
+import userRouter from './routes/user.route.js'
+
+//routes declaration
+app.use('/api/v1/users', userRouter)
+
 export { app }

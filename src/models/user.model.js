@@ -48,7 +48,7 @@ const userSchema = new Schema({
 
 userSchema.pre("save", async function (next) {
     if (!this.isModified("password")) return next();    // isModified is available by default and tells us if the field is changed or not.
-    this.password = bcrypt.hash(this.password, 10)
+    this.password = await bcrypt.hash(this.password, 10)
     next()
 })   // we can not use arrow function in the second argument because this is not defined in the arrow functions and we need it here.
 

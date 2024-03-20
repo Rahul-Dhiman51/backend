@@ -2,13 +2,15 @@
 
 // Here we are creating wrapper functions to ease our life so that we don't have to write repeative
 //code again n again for handling async calls.
+///// when we use async functions we have write either .then().catch() or try{} catch{} to consume the promises or async calls
+// as we don't have to write that repeative code of try and catch this wrapper is created
 
 //First is Promise method...as DB connection returns promises.
 //Second is using try n catch
 
 
 const asyncHandler = (requestHandler) => {
-    (err, req, res, next) => {
+    return (req, res, next) => {
         Promise
             .resolve(requestHandler(req, res, next))
             .catch((error) => next(error))
