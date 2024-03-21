@@ -4,6 +4,22 @@ import { apiResponse } from "../utils/apiRespose.js";
 import { User } from '../models/user.model.js'
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
+const generateAccessAndRefreshToken = async function (userId) {
+    try {
+        const user = await User.findById(userId)
+        const accessToken = await user.generateAccessToken()
+        const refreshToken = await user.generateRefreshToken()
+
+        user.refreshToken = refreshToken;
+        await user.save({ validateBeforeSave: false })  // So that mongoDB does not validate the data before saving if it validates it will throw an error
+
+        return { accessToken, refreshToken }
+
+    } catch (error) {
+        throw new apiError(500, "Something went wrong while generating refresh and access token")
+    }
+}
+
 const registerUser = asyncHandler(async (req, res) => {
     // res.status(200).json({
     //     message: "ok"
@@ -21,6 +37,7 @@ const registerUser = asyncHandler(async (req, res) => {
     // step9- return res
 
     //step1-
+    console.log(req.body)
     const { fullName, email, username, password } = req.body
 
     //step2-
@@ -93,4 +110,86 @@ const registerUser = asyncHandler(async (req, res) => {
 
 })
 
-export { registerUser }
+
+const loginUser = asyncHandler(async (req, res) => {
+
+    //step1- get user details from frontend
+    //step2- validate the details - not empty
+    //step3- check if the user exists with that email or username
+    //step4- check if the password entered is correct
+    //step5- generate access_token and refresh_token
+    //step6- send the cookie with tokens to the frontend
+
+    //step1-
+    const { email, username, password } = req.body;
+    console.log(req.body)
+    if (!(username || email)) {
+        throw new apiError(400, "username or password is required")
+    }
+
+    const existedUser = await User.findOne({
+        $or: [{ username }, { email }]
+    })
+
+    if (!existedUser) {
+        throw new apiError(404, "User does not exist")
+    }
+
+    const isPasswordValid = await existedUser.isPasswordCorrect(password)   // this method is defined by us in the schema so it is only available in the instance existedUser not the User model...keep that in mind.
+    if (!isPasswordValid) {
+        throw new apiError(401, "Invalid user credentials")
+    }
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(existedUser._id)
+
+    const loggedInUser = await User.findById(existedUser._id).select("-password -refreshToken")
+
+    const options = {
+        httpOnly: true,
+        secure: true,
+    }   //by default cookies are modifyable in frontend by enabling these options they can only be modified at server, still visible at frontend.
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new apiResponse(
+                200,
+                {
+                    user: loggedInUser,
+                    accessToken,
+                    refreshToken
+                },
+                "User logged in Successfully"
+            )
+        )
+})
+
+const logoutUser = asyncHandler(async (req, res) => {
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {
+                refreshToken: undefined,
+            }
+        },
+        {
+            new: true,
+        }
+    )
+
+    const options = {
+        httpOnly: true,
+        secure: true,
+    }
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new apiResponse(200, {}, "User logged Out"))
+
+})
+
+export { registerUser, loginUser, logoutUser }
