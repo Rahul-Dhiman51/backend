@@ -35,7 +35,7 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     //step3-
-    const existedUser = User.findOne({
+    const existedUser = await User.findOne({
         $or: [{ username }, { email }]  // want to check if username is also not taken by someone so here it will check if username as well as email is not used by another existing user.
     })
 
@@ -44,9 +44,17 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     //step4-
-    console.log(req.files)
+    // console.log(req.files)
     const avatarLocalPath = req.files?.avatar[0]?.path;
-    const coverImageLocalPath = req.files?.coverImage[0]?.path;
+
+    // coverImage is not a required field so if no coverImage is uploaded from the client and we are checking it here so it will through and type error as follows...
+    //TypeError: Cannot read properties of undefined (reading '0')
+    // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+
+    let coverImageLocalPath;
+    if (req.files && Array.isArray(req.files.coverImage) && registerUser.files.coverImage.length > 0) {
+        coverImageLocalPath = req.files.avatar[0].path;
+    }
 
     if (!avatarLocalPath) {
         throw new apiError(400, "Avatar file is required")
