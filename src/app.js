@@ -2,6 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";   //Used to perform CRUD operation on the cookies stored in browser.
 // There are some secure cookies that only server can read and write.
 import cors from "cors";
+import dotenv from "dotenv"
 
 const app = express();
 
