@@ -2,8 +2,9 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiRespose.js";
 import { User } from '../models/user.model.js'
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshToken = async function (userId) {
     try {
@@ -168,6 +169,7 @@ const loginUser = asyncHandler(async (req, res) => {
 })
 
 const logoutUser = asyncHandler(async (req, res) => {
+    // console.log(req.user)
     await User.findByIdAndUpdate(
         req.user._id,
         {
@@ -190,7 +192,6 @@ const logoutUser = asyncHandler(async (req, res) => {
         .clearCookie("accessToken", options)
         .clearCookie("refreshToken", options)
         .json(new apiResponse(200, {}, "User logged Out"))
-
 })
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
@@ -258,7 +259,9 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 const getCurrentUser = asyncHandler(async (req, res) => {
     return req
         .status(200)
-        .json(200, req.user, "Current user fetched successfully")
+        .json(
+            new apiResponse(200, req.user, "Current user fetched successfully")
+        )
 })
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
@@ -288,16 +291,20 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path
+    // console.log(avatarLocalPath)
 
     if (!avatarLocalPath) {
         throw new apiError(400, "Avatar file is missing")
     }
 
-    const avatar = uploadOnCloudinary(avatarLocalPath)
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
 
     if (!avatar.url) {
         throw new apiError(400, "Error while uploading on avatar")
     }
+
+    const deletePreviousAvatar = await deleteOnCloudinary(req.user?.avatar)
+    // console.log(deletePreviousAvatar)
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
@@ -307,7 +314,9 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
             }
         },
         { new: true }
-    )
+    ).select("-password")
+
+    console.log(user)
 
     return res
         .status(200)
@@ -323,10 +332,14 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         throw new apiError(400, "Cover image file is missing")
     }
 
-    const coverImage = uploadOnCloudinary(coverImageLocalPath)
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath)
 
     if (!coverImage.url) {
         throw new apiError(400, "Error while uploading on cover image")
+    }
+
+    if (req.user?.coverImage) {
+        const deletePreviousCoverImage = await deleteOnCloudinary(req.user?.coverImage)
     }
 
     const user = await User.findByIdAndUpdate(
@@ -337,7 +350,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
             }
         },
         { new: true }
-    )
+    ).select("-password")
 
     return res
         .status(200)
@@ -346,4 +359,120 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         )
 })
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateUserAvatar, updateUserCoverImage }
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+    const { username } = req.username
+
+    if (!username?.trim()) {
+        throw new apiError(400, "username is missing")
+    }
+
+    const channel = await User.aggregate([
+        {
+            // match is used to filter the data from the collection and it is used as the first stage in the pipeline
+            $match: {
+                username: username?.toLowerCase()
+            }
+        },
+        {
+            // lookup is used to join the data from another collection and it is used as the second stage in the pipeline
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subcribedTo"
+            }
+        },
+        {
+            // addFields is used to add new fields to the document and it is used as the third stage in the pipeline
+            $addFields: {
+                subscribersCount: {
+                    $size: "$subscribers"
+                },
+                channelsSubscribedToCount: {
+                    $size: "$subcribedTo"
+                },
+                isSubscribed: {
+                    $cond: {
+                        // in is used to check if the value is present in the array or object both.
+                        // Here we are checking that the logged in user is present in the subscribers array or not
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            // project is used to select the fields from the document and it is used as the fourth stage in the pipeline
+            $project: {
+                fullName: 1,
+                username: 1,
+                subscribersCount: 1,
+                channelsSubscribedToCount: 1,
+                isSubscribed: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1
+            }
+        }
+    ])
+
+    if (!channel?.length) {
+        throw new apiError(404, "Channel does not exist")
+    }
+
+    return res
+        .status(200)
+        .json(
+            new apiResponse(200, channel[0], "User channel fetched successfully")
+        )
+})
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+    const user = await User.aggregate([
+        {
+            // req.user._id returns a string but mongo Object id is "ObjectId('xyz..')". When we make a request to database mongoose behind the scene handles it and converts that string into mongo object id.
+            //  In pipelines it does not happen behind the scenes so we have to do it manually using mongoose.
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id)
+            }
+        },
+        {
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        fullName: 1,
+                                        username: 1,
+                                        avatar: 1
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+})
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateUserAvatar, updateUserCoverImage, getUserChannelProfile }
